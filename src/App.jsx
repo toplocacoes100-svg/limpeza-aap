@@ -691,6 +691,10 @@ const ERROS_AUTH = {
   "auth/invalid-email": "E-mail inválido.",
   "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos e tente de novo.",
   "auth/network-request-failed": "Sem conexão com a internet.",
+  "auth/operation-not-allowed": "O login por e-mail e senha não está ativado no Firebase. Ative em Authentication → Método de login → E-mail/senha.",
+  "auth/configuration-not-found": "O Authentication ainda não foi ativado no Firebase. Abra Authentication e clique em “Vamos começar”, depois ative E-mail/senha.",
+  "auth/unauthorized-domain": "Este endereço do site não está autorizado no Firebase. Adicione-o em Authentication → Configurações → Domínios autorizados.",
+  "auth/admin-restricted-operation": "A criação de contas está bloqueada no Firebase. Confira em Authentication → Configurações → Ações do usuário.",
 };
 
 function TelaLogin() {
@@ -719,7 +723,8 @@ function TelaLogin() {
         setInfo("Enviamos um link para redefinir sua senha. Confira seu e-mail.");
       }
     } catch (err) {
-      setErro(ERROS_AUTH[err.code] || "Não foi possível continuar. Tente novamente.");
+      console.error(err);
+      setErro(ERROS_AUTH[err.code] || `Não foi possível continuar. Código do erro: ${err.code || err.message || "desconhecido"}`);
     }
     setCarregando(false);
   };
@@ -3013,22 +3018,36 @@ export default function App() {
   const [user, setUser] = useState(undefined);
   const [perfil, setPerfil] = useState(null);
   const criando = useRef(false);
+  const [erroPerfil, setErroPerfil] = useState("");
 
-  useEffect(() => onAuthStateChanged(auth, (u) => { setUser(u || null); if (!u) { setPerfil(null); criando.current = false; } }), []);
+  useEffect(() => onAuthStateChanged(auth, (u) => { setUser(u || null); if (!u) { setPerfil(null); setErroPerfil(""); criando.current = false; } }), []);
   useEffect(() => {
     if (!user) return undefined;
     return onSnapshot(doc(db, "usuarios", user.uid), (s) => {
       if (s.exists()) setPerfil({ uid: user.uid, ...s.data() });
       else {
         setPerfil(null);
-        if (!criando.current) { criando.current = true; criarPerfil(user, nomePendente).catch((e) => console.error(e)); }
+        if (!criando.current) {
+          criando.current = true;
+          criarPerfil(user, nomePendente).catch((e) => { console.error(e); setErroPerfil(e.code || e.message || "erro"); });
+        }
       }
-    }, (e) => console.error(e));
+    }, (e) => { console.error(e); setErroPerfil(e.code || e.message || "erro"); });
   }, [user]);
 
   let tela;
   if (user === undefined) tela = <Splash />;
   else if (!user) tela = <TelaLogin />;
+  else if (!perfil && erroPerfil) tela = (
+    <div className="login">
+      <div className="login-card grid">
+        <div className="aviso bad"><Ic n="alert" /><span>Sua conta foi criada, mas o banco de dados recusou o acesso. Confira no Firebase se o <b>Firestore Database</b> foi criado e se as <b>regras</b> do arquivo firestore.rules foram publicadas.</span></div>
+        <div className="small faint">Código do erro: {erroPerfil}</div>
+        <button className="btn pri block" onClick={() => { setErroPerfil(""); criando.current = false; setUser(null); setTimeout(() => setUser(auth.currentUser), 50); }}>Tentar novamente</button>
+        <button className="btn block" onClick={() => signOut(auth)}><Ic n="logout" /> Sair</button>
+      </div>
+    </div>
+  );
   else if (!perfil) tela = <Splash texto="Preparando seu acesso..." />;
   else if (!PERMS[perfil.papel]) tela = <TelaPendente perfil={perfil} />;
   else tela = <Sistema perfil={perfil} />;
