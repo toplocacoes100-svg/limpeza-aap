@@ -44,6 +44,8 @@ const EMPRESA_PADRAO = {
 const comPadrao = (cfg) => {
   const out = { ...EMPRESA_PADRAO };
   Object.entries(cfg || {}).forEach(([k, v]) => { if (v !== "" && v !== undefined && v !== null) out[k] = v; });
+  // nome provisório da primeira versão é trocado pelo nome da marca
+  if (String(out.empresaNome).trim().toLowerCase() === "minha empresa de limpeza") out.empresaNome = EMPRESA_PADRAO.empresaNome;
   return out;
 };
 
@@ -1026,7 +1028,7 @@ function PaginaInicio() {
           <div className="hero-logo" style={{ background: "#fff" }}><img src={ICONE} alt="" /></div>
           <div style={{ minWidth: 0 }}>
             <div className="sub">{config.empresaNome}</div>
-            <h1>{saudacao}, {primeiroNome(perfil.nome)}</h1>
+            <h1>{saudacao}, {String(perfil.nome || "").trim() || config.empresaNome}</h1>
             <div className="sub">{DIA_NOME[agora.getDay()]}, {agora.getDate()} de {MES_NOME[agora.getMonth()]}</div>
           </div>
         </div>
